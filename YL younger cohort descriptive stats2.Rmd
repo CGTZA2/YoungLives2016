@@ -1,0 +1,306 @@
+---
+title: "Descriptive statistics for data file PERU younger cohort"
+output:
+ html_document: default
+ html_notebook: default
+---
+
+First, setup.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load some packages
+
+```{r load_packages}
+
+library(pacman) #install this if not already present
+p_load(tidyverse, haven, magrittr, psych, car, knitr)
+```
+
+Then we clear the workspace, and load the data file created in the script "import data from YL files script".
+
+```{r load_data}
+
+rm(list=ls(all=TRUE))
+
+load("peru_long.Rdata")
+
+```
+
+We do a general description, per group of variables.
+
+**1  Child descriptors**
+
+```{r child_descriptors}
+cat ("Table of OC vs YC")
+table(peru_long.dat$yc)
+
+# Create ggplot functions for re-use
+gghisto <- function(data, mapping) {
+  argf = paste("aes(",mapping,")") %>% 
+  ggplot(data, mapping) +
+  geom_histogram(color = "red", fill = "white", binwidth = 5)
+}
+
+gghisto_facet <- function(data, mapping) {
+  ggplot(data, mapping) +
+  geom_histogram(color = "red", fill = "white", binwidth = 5) +
+  facet_grid(. ~ round, scales = "free")
+}
+
+# Create missing value function for re-use
+f.missing <- function (v) {
+              a <- sum(is.na(v))
+              a
+              }
+
+
+gghisto(peru_long.dat, aes(x = age_months))
+
+
+peru_long.dat %>% 
+ filter(yc == 1) %>% 
+ggplot(aes(x = age_months))+
+ geom_histogram(color = "red", fill = "white", binwidth = 5)+
+ facet_grid(. ~ round, scales = "free")
+
+cat("Descriptive statistics for age months")
+ peru_long.dat %>% 
+  select(age_months, round) %$% 
+  describeBy(.,round)
+ 
+cat("Missing values for age months") 
+peru_long.dat %>%
+ filter(yc == 1) %$% 
+ sum(is.na(age_months))
+
+```
+
+**2  Child social status**
+
+```{r describe_status}
+
+cat ("Tables")
+temp <- peru_long.dat %>% 
+          filter(yc == 1) %>% 
+          select(sex, typesite, chlang, indigenous, birth_order) 
+map(temp, table)
+
+cat ("Missing values")
+map(temp, f.missing)
+
+```
+
+**3  Poverty Inequality and Shocks**
+
+```{r describe_povertyetc}
+
+peru_long.dat %>% 
+ filter(yc == 1) %>% 
+ggplot(aes(x = wi))+
+ geom_histogram(color = "red", fill = "white", binwidth = 0.10)+
+ facet_grid(. ~ round, scales = "free")
+ 
+f.missing(peru_long.dat$wi)
+
+peru_long.dat %>% 
+ filter(yc == 1) %>% 
+ggplot(aes(x = totalexp))+
+ geom_histogram(color = "red", fill = "white")+
+ facet_grid(. ~ round, scales = "free")+
+ scale_x_log10()
+ 
+f.missing(peru_long.dat$totalexp)
+
+peru_long.dat %>% 
+ filter(yc == 1) %>% 
+ggplot(aes(x = sumshock))+
+ geom_histogram(color = "red", fill = "white", binwidth = 2)+
+ facet_grid(. ~ round, scales = "free")
+ 
+f.missing(peru_long.dat$sumshock)
+
+peru_long.dat %>% 
+ filter(yc == 1) %>% 
+ggplot(aes(x = food_security))+
+ geom_histogram(color = "red", fill = "white", binwidth = 5)+
+ facet_grid(. ~ round, scales = "free")
+ 
+cat("Descriptive statistics for food_security")
+ peru_long.dat %>% 
+  select(food_security, round) %$% 
+  describeBy(.,round)
+
+peru_long.dat %>% 
+ filter(yc == 1) %$% 
+ table(food_shortage, round) 
+f.missing(peru_long.dat$food_security)
+
+peru_long.dat %>% 
+ filter(yc == 1) %>% 
+ filter(round == 2 | round==3) %>% 
+ filter(!is.na(income_monthly)) %>% 
+ mutate(income_monthly = income_monthly + 10) %>% 
+ggplot(aes(x = income_monthly))+
+ geom_histogram(color = "red", fill = "white")+
+ facet_grid(. ~ round)+
+ scale_x_log10()
+
+cat("Descriptive statistics for income_monthly")
+ peru_long.dat %>% 
+  select(income_monthly, round) %$% 
+  describeBy(.,round)
+f.missing(peru_long.dat$income_monthly)
+
+```
+
+**4  Caregiver influences**
+
+```{r describe_caregiver_influences}
+
+peru_long.dat %>% 
+ filter(yc == 1) %>% 
+ggplot(aes(x = momedu))+
+ geom_histogram(color = "red", fill = "white", binwidth = 3)+
+ facet_grid(. ~ round)
+
+cat("Descriptive statistics for momedu")
+ peru_long.dat %>% 
+  select(momedu, round) %$% 
+  describeBy(.,round)
+f.missing(peru_long.dat$momedu)
+
+peru_long.dat %>% 
+ filter(yc == 1) %>% 
+ggplot(aes(x = dadedu))+
+ geom_histogram(color = "red", fill = "white", binwidth = 3)+
+ facet_grid(. ~ round)
+
+cat("Descriptive statistics for dadedu")
+ peru_long.dat %>% 
+  select(dadedu, round) %$% 
+  describeBy(.,round)
+f.missing(peru_long.dat$dadedu)
+
+peru_long.dat %>% 
+ filter(yc == 1) %>% 
+ggplot(aes(x = caredu))+
+ geom_histogram(color = "red", fill = "white", binwidth = 3)+
+ facet_grid(. ~ round)
+
+cat("Descriptive statistics for caredu")
+ peru_long.dat %>% 
+  select(caredu, round) %$% 
+  describeBy(.,round)
+f.missing(peru_long.dat$caredu)
+
+
+# Marital status of the caregiver. Codes are:
+# 1 = Permanent partner
+# 2 = Divorced or separated
+# 3 = Single
+# 4 = Widowed
+
+peru_long.dat %>% 
+ filter(yc==1 & round==4 & !is.na(mat_wellbeing)) %>% 
+ mutate(mat_wellbeing = mat_wellbeing +1) %>% 
+ggplot(aes(x = mat_wellbeing))+
+ geom_histogram(color = "red", fill = "white")
+
+cat("Descriptive statistics for mat_wellbeing")
+ peru_long.dat %>% 
+  filter(yc==1 & round==4 & !is.na(mat_wellbeing)) %>% 
+  select(mat_wellbeing, round) %$% 
+  describeBy(.,round)
+
+
+temp <- peru_long.dat %>% 
+          select(partner, mat_wellbeing, momlit, dadlit, EMBORR, 
+                 EMBPEG, PEDRUNK, PEAGGRSS, DPALM,
+                 LSAC, LPELL, LAMEN) 
+map(temp, table)
+map(temp, f.missing)  
+
+```
+
+```{r describe_caregiver_aspirations}
+
+temp <- peru_long.dat %>% 
+          select(EXPEDU, EXPEARN, GRADLIKE, CAMBITN, GRDLKER3, 
+                 CAMBTNR3, LVEEDCR4, ERNMNYR4, GRDLKER4,
+                 CAMBTNR4, LPELL, LAMEN, YCEXTUR3, WRKDAYR3, 
+                 MTPRASR3, GRPMTGR3, INDMTGR3, SCHPRTR3, FNDRSER3, 
+                 BOOKHMR3, READTXR3, HLPHMWR3, numbooksr4, txtfunr4, 
+                 HLPHMWR4) 
+map(temp, table)
+map(temp, f.missing)  
+
+
+
+
+```
+
+
+```{r describe_child_health}
+
+cat("Tables for health vars")
+temp <- peru_long.dat %>% 
+          select(stunt= stunt,  sstunt= sstunt,  
+        cladder= cladder,  hcare= hcare,  hchore= hchore,  
+        htask= htask,  hwork= hwork) 
+map(temp, table)
+map(temp, f.missing)  
+
+
+```
+
+
+
+```{r describe_child_education}
+
+
+cat("Tables for health vars")
+temp <- peru_long.dat %>% 
+          select(stunt= stunt,  sstunt= sstunt,  
+        cladder= cladder,  hcare= hcare,  hchore= hchore,  
+        htask= htask,  hwork= hwork, score_ppvt, ATTPRER4, ppvt, 
+        ppvt_perco, math_co, maths_perco, readprob, writeprob,
+        literate, hstudy, TMONINR3, FTRWRKR3,JOBLKER4, CLDSTDR4) 
+map(temp, table)
+map(temp, f.missing)  
+
+
+gghisto(peru_long.dat, aes(score_ppvt))
+gghisto(peru_long.dat, aes(ATTPRER4))
+gghisto(peru_long.dat, aes(ppvt))
+gghisto(peru_long.dat, aes(ppvt_perco))
+gghisto(peru_long.dat, aes(math_co))
+gghisto(peru_long.dat, aes(maths_perco))
+gghisto(peru_long.dat, aes(readprob))
+gghisto(peru_long.dat, aes(writeprob))
+gghisto(peru_long.dat, aes(literate))
+gghisto(peru_long.dat, aes(hstudy))
+gghisto(peru_long.dat, aes(TMONINR3))
+gghisto(peru_long.dat, aes(FTRWRKR3))
+gghisto(peru_long.dat, aes(JOBLKER4))
+gghisto(peru_long.dat, aes(CLDSTDR4))
+
+
+```
+
+```{r describe_education_environment}
+
+x <- peru_long.dat %>% 
+   select(yc, contains ("SCWHYR"), contains ("WMSSCR")) %>% 
+   filter(yc == 1)  
+map(x,table)
+map(x, f.missing)
+
+
+
+```
+
+
+

@@ -1,0 +1,545 @@
+---
+title: "Preliminary look at possible latent variables, YL-YC"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+We take a look at possible latent variables, working backwards from outcomes
+
+First, we load the data file, and some packages
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load some packages
+
+```{r load_packages}
+
+library(pacman) #install this if not already present
+p_load(tidyverse, haven, magrittr, psych, car, knitr, lavaan, GPArotation, reshape2)
+```
+
+Then we clear the workspace, and load the data file created in the script "import data from YL files script".
+
+```{r load_data}
+
+rm(list=ls(all=TRUE))
+
+load("peru_long_yc.Rdata")
+
+```
+
+
+
+# 1  Overall measurement model 
+
+Let's try putting a measurement model together for the whole model
+
+```{r overall+measure_model}
+
+
+temp <- peru_long.dat %>% 
+          select(childid, round, typesite, indigenous,
+                 mother_age_birth, partner, momedu, dadlit, momlit, 
+                 wi_early_yrs, food_insecurity_r2, totalexp,
+                 chore_hours, school_type, hours_study, read_encourage,
+                 sdq1, sdq3, sdq4, sdq5, 
+                 sdq9, sdq8, sdq10, sdq11, 
+                 sdq13, sdq16, sdq12, sdq14,
+                 sdq17, sdq20, sdq15, sdq18, 
+                 sdq19,
+                 drink_to_drunk, drunk_hit, alc_1perwk,
+                 stunting_to_r3, probs_vision, probs_resp,
+                 care_school_qual2, care_school_qual3,
+                 care_school_qual4, 
+                 school_punish1, school_punish2,
+                 lang_instruct_matches,
+                 ppvt_raw, maths_perco, yrs_grtr_grade, literate, deprived_grouping) %>% 
+          melt(id.vars = c("childid","round")) %>% 
+          dcast(childid ~ round + variable)
+            
+
+temp %<>% 
+  mutate(`1_mother_age_birth` = `1_mother_age_birth`/25,
+         `2_totalexp` = `2_totalexp`/750,
+         `4_ppvt_raw`= `4_ppvt_raw`/200,
+         `4_maths_perco`= `4_maths_perco`/200,
+         `3_chore_hours`= `3_chore_hours`/2.2,
+         `3_read_encourage` = `3_read_encourage`/3.2,
+         `3_stunting_to_r3` = `3_stunting_to_r3`/2)
+
+temp %<>% 
+  select(`1_mother_age_birth`, `1_partner`,
+                   `1_momedu`, `1_dadlit`, `1_momlit`, `1_typesite`, `1_indigenous`,
+
+                   `2_wi_early_yrs`, `2_food_insecurity_r2`, `2_totalexp`,
+
+                   `3_chore_hours`, `3_school_type`, `3_hours_study`,
+                                `3_read_encourage`,
+
+                             `1_sdq1`, `1_sdq3`, `1_sdq4`, `1_sdq5`,  
+                               `1_sdq9`, `1_sdq8`, `1_sdq10`, `1_sdq11`,  
+                               `1_sdq13`, `1_sdq14`, 
+                               `1_sdq17`, `1_sdq20`, `1_sdq15`, `1_sdq18`, 
+                    `1_sdq19`,
+                    `1_drink_to_drunk`, `1_drunk_hit`, `1_alc_1perwk`,
+
+
+                # Child health
+                    `3_stunting_to_r3`, `3_probs_vision`, `3_probs_resp`,
+
+                # School environment
+                    `3_care_school_qual2`, `3_care_school_qual3`, 
+                    `3_care_school_qual4`, 
+                    `3_school_punish1`, `3_school_punish2`,  
+                    `3_lang_instruct_matches`,
+
+                # Round`3 outcomes
+                    `3_ppvt_raw`, `3_maths_perco`, `3_yrs_grtr_grade`, 
+                                  `3_literate`, 
+                # Round`4 outcomes
+                   `4_ppvt_raw`, `4_maths_perco`, `4_yrs_grtr_grade`) 
+
+# summary(temp)
+
+temp.model <- '
+               # Caregiver Status
+                   care_status =~ `1_partner` + `1_mother_age_birth`
+                   lit_ed =~`1_momedu` +`1_momlit`
+                   
+
+               # # Economic well-being
+                    eco_well_being_cfa =~`2_wi_early_yrs` +`2_food_insecurity_r2` +`2_totalexp`
+
+               # Education investment
+                   ed_invest =~`3_chore_hours` +`3_school_type` +`3_hours_study`+
+                                `3_read_encourage`
+         
+
+               # Adverse EC environment
+                    mmhealth =~`1_sdq1` +`1_sdq3` +`1_sdq4` +`1_sdq5` + 
+                               `1_sdq9` +`1_sdq8` +`1_sdq10` +`1_sdq11` + 
+                               `1_sdq13` +`1_sdq14` +
+                               `1_sdq17 ` +`1_sdq20` +`1_sdq15` +`1_sdq18` +
+                               `1_sdq19`
+                    
+                # Child health
+                    child_health =~`3_stunting_to_r3` +`3_probs_vision` +`3_probs_resp`
+
+                # School environment
+                   #  school_qual =~`3_care_school_qual2` +`3_care_school_qual3` +
+                   # `3_care_school_qual4` 
+                    # school_punish =~`3_school_punish1` +`3_school_punish2`  
+                    lang_instruct =~`3_lang_instruct_matches`
+                     # school_environ =~ school_qual + lang_instruct
+                     # school_environ ~~ 1*school_environ
+
+                # Round`3 outcomes
+                    # outcomes_r3 =~`3_ppvt_raw` +`3_maths_perco` +`3_yrs_grtr_grade` +
+                                  # `3_literate` 
+                # Round`4 outcomes
+                    outcomes_ =~`4_ppvt_raw` +`4_maths_perco` +`4_yrs_grtr_grade`
+
+              '
+temp.model.fit <- cfa(temp.model, data = temp)
+summary(temp.model.fit, fit.measures = T)
+x <- modindices(temp.model.fit)
+```
+
+
+# 2  Now we look at structural + measurement model for R4 outcome
+
+```{r struc+meas_r4}
+
+temp <- peru_long.dat %>% 
+          select(childid, round, typesite, indigenous,
+                 mother_age_birth, partner, momedu, dadlit, momlit, 
+                 wi_early_yrs, food_insecurity_r2, totalexp,
+                 chore_hours, school_type, hours_study, read_encourage,
+                 sdq1, sdq3, sdq4, sdq5, 
+                 sdq9, sdq8, sdq10, sdq11, 
+                 sdq13, sdq16, sdq12, sdq14,
+                 sdq17, sdq20, sdq15, sdq18, 
+                 sdq19,
+                 drink_to_drunk, drunk_hit, alc_1perwk,
+                 stunting_to_r3, probs_vision, probs_resp,
+                 care_school_qual2, care_school_qual3,
+                 care_school_qual4, 
+                 school_punish1, school_punish2,
+                 lang_instruct_matches,
+                 ppvt_raw, maths_perco, yrs_grtr_grade, literate, deprived_grouping) %>% 
+          melt(id.vars = c("childid","round")) %>% 
+          dcast(childid ~ round + variable)
+
+temp %<>% 
+  mutate(`1_mother_age_birth` = `1_mother_age_birth`/25,
+         `2_totalexp` = `2_totalexp`/750,
+         `4_ppvt_raw`= `4_ppvt_raw`/200,
+         `4_maths_perco`= `4_maths_perco`/200,
+         `3_chore_hours`= `3_chore_hours`/2.2,
+         `3_read_encourage` = `3_read_encourage`/3.2,
+         `3_stunting_to_r3` = `3_stunting_to_r3`/2)
+
+temp.model <- '
+               # Caregiver Status
+                   older_with_partner =~ `1_partner` 
+                  # `1_mother_age_birth`
+                   lit_ed =~`1_momedu` +`1_momlit`
+                  
+               # # Economic well-being
+                    eco_well_being_cfa =~`2_wi_early_yrs` +`2_food_insecurity_r2` +`3_school_type`
+                    # +`2_totalexp`
+
+               # Education investment
+                   ed_invest =~`3_chore_hours` +`3_hours_study`+
+                                `3_read_encourage`
+         
+
+               # Adverse EC environment
+                    mmhealth =~`1_sdq1` +`1_sdq3` +`1_sdq4` +`1_sdq5` + 
+                               `1_sdq8` +`1_sdq10` + 
+                               `1_sdq13` +`1_sdq14` +
+                               `1_sdq17 `  +`1_sdq15` +`1_sdq18` +
+                               `1_sdq19`
+                    
+                # Child health
+                    child_health =~`3_stunting_to_r3` +`3_probs_vision` +`3_probs_resp`
+
+                # School environment
+                   #  school_qual =~`3_care_school_qual2` +`3_care_school_qual3` +
+                   # `3_care_school_qual4` 
+                    # school_punish =~`3_school_punish1` +`3_school_punish2`  
+                     # lang_instruct =~`3_lang_instruct_matches`
+                     # school_environ =~ school_qual + lang_instruct
+                     # school_environ ~~ 1*school_environ
+
+                # Round`3 outcomes
+                    # outcomes_r3 =~`3_ppvt_raw` +`3_maths_perco` +`3_yrs_grtr_grade` +
+                                  # `3_literate` 
+                # Round`4 outcomes
+                    outcomes_r4 =~`4_ppvt_raw` +`4_maths_perco` +`4_yrs_grtr_grade` 
+
+
+                # REG COMPONENT
+      
+                     eco_well_being_cfa ~ lit_ed          
+                     mmhealth ~ lit_ed 
+                     child_health ~ eco_well_being_cfa 
+                     ed_invest ~ eco_well_being_cfa  + lit_ed
+                     # lang_instruct ~ eco_well_being_cfa
+                     outcomes_r4 ~ ed_invest 
+                      # + child_health + mmhealth + lang_instruct
+
+              '
+
+temp.model.fit <- sem(temp.model, data = temp)
+summary(temp.model.fit, fit.measures = T)
+inspect(temp.model.fit, "rsquare")
+x <- modindices(temp.model.fit)
+resid(temp.model.fit, type = "standardized")
+summary(temp.model.fit, fit.measures = T, standardized = TRUE)
+
+```
+
+
+# 3  Now we look at structural + measurement model for R3
+
+```{r struc+meas_r3}
+
+# Let's repeat this for Round 3 outcomes
+# But note that one has to load the original data again
+
+temp <- peru_long.dat %>% 
+          select(childid, round, typesite, indigenous,
+                 mother_age_birth, partner, momedu, dadlit, momlit, 
+                 wi_early_yrs, food_insecurity_r2, totalexp,
+                 chore_hours, school_type, hours_study, read_encourage,
+                 sdq1, sdq3, sdq4, sdq5, 
+                 sdq9, sdq8, sdq10, sdq11, 
+                 sdq13, sdq16, sdq12, sdq14,
+                 sdq17, sdq20, sdq15, sdq18, 
+                 sdq19,
+                 drink_to_drunk, drunk_hit, alc_1perwk,
+                 stunting_to_r3, probs_vision, probs_resp,
+                 care_school_qual2, care_school_qual3,
+                 care_school_qual4, 
+                 school_punish1, school_punish2,
+                 lang_instruct_matches,
+                 ppvt_raw, maths_perco, yrs_grtr_grade, literate, deprived_grouping) %>% 
+          melt(id.vars = c("childid","round")) %>% 
+          dcast(childid ~ round + variable)
+
+temp %<>% 
+  mutate(`1_mother_age_birth` = `1_mother_age_birth`/25,
+         `2_totalexp` = `2_totalexp`/750,
+         `3_ppvt_raw`= `3_ppvt_raw`/200,
+         `3_maths_perco`= `3_maths_perco`/200,
+         `3_chore_hours`= `3_chore_hours`/2.2,
+         `3_read_encourage` = `3_read_encourage`/3.2,
+         `3_stunting_to_r3` = `3_stunting_to_r3`/2)
+
+temp.model <- '
+               # Caregiver Status
+                   older_with_partner =~ `1_partner` 
+                  # `1_mother_age_birth`
+                   lit_ed =~`1_momedu` +`1_momlit`
+                  
+               # # Economic well-being
+                    eco_well_being_cfa =~`2_wi_early_yrs` +`2_food_insecurity_r2` +`3_school_type`
+                    # +`2_totalexp`
+
+               # Education investment
+                   ed_invest =~`3_chore_hours` +`3_hours_study`+
+                                `3_read_encourage`
+         
+
+               # Adverse EC environment
+                    mmhealth =~`1_sdq1` +`1_sdq3` +`1_sdq4` +`1_sdq5` + 
+                               `1_sdq8` +`1_sdq10` + 
+                               `1_sdq13` +`1_sdq14` +
+                               `1_sdq17 `  +`1_sdq15` +`1_sdq18` +
+                               `1_sdq19`
+                    
+                # Child health
+                    child_health =~`3_stunting_to_r3` +`3_probs_vision` +`3_probs_resp`
+
+                # School environment
+                   #  school_qual =~`3_care_school_qual2` +`3_care_school_qual3` +
+                   # `3_care_school_qual4` 
+                    # school_punish =~`3_school_punish1` +`3_school_punish2`  
+                     # lang_instruct =~`3_lang_instruct_matches`
+                     # school_environ =~ school_qual + lang_instruct
+                     # school_environ ~~ 1*school_environ
+
+                # Round`3 outcomes
+                   outcomes_r3 =~`3_ppvt_raw` +`3_maths_perco` +`3_yrs_grtr_grade` 
+                                  # `3_literate` 
+                # Round`4 outcomes
+                    # outcomes_r4 =~`4_ppvt_raw` +`4_maths_perco` 
+
+
+                # REG COMPONENT
+      
+                     eco_well_being_cfa ~ lit_ed          
+                     mmhealth ~ lit_ed 
+                     child_health ~ eco_well_being_cfa 
+                     ed_invest ~ eco_well_being_cfa  + lit_ed
+                     # lang_instruct ~ eco_well_being_cfa
+                     outcomes_r3 ~ ed_invest 
+                      # + child_health + mmhealth + lang_instruct
+
+              '
+
+temp.model.fit <- sem(temp.model, data = temp)
+summary(temp.model.fit, fit.measures = T)
+inspect(temp.model.fit, "rsquare")
+x <- modindices(temp.model.fit)
+resid(temp.model.fit, type = "standardized")
+summary(temp.model.fit, fit.measures = T, standardized = TRUE)
+
+
+```
+
+# 4  Model by group : rural and indigenous vs urban and SPanish
+
+```{r struc+meas_r4_rural2}
+
+# Try to repeat model for disad group split
+
+temp <- peru_long.dat %>% 
+          select(childid, round,
+                 mother_age_birth, partner, momedu, dadlit, momlit, 
+                 wi_early_yrs, food_insecurity_r2, totalexp,
+                 chore_hours, school_type, hours_study, read_encourage,
+                 sdq1, sdq3, sdq4, sdq5, 
+                 sdq9, sdq8, sdq10, sdq11, 
+                 sdq13, sdq16, sdq12, sdq14,
+                 sdq17, sdq20, sdq15, sdq18, 
+                 sdq19,
+                 drink_to_drunk, drunk_hit, alc_1perwk,
+                 stunting_to_r3, probs_vision, probs_resp,
+                 care_school_qual2, care_school_qual3,
+                 care_school_qual4, 
+                 school_punish1, school_punish2,
+                 lang_instruct_matches,
+                 ppvt_raw, maths_perco, yrs_grtr_grade, literate, deprived_grouping) %>% 
+          melt(id.vars = c("childid","round")) %>% 
+          dcast(childid ~ round + variable)
+            
+temp %<>% 
+  mutate(`1_mother_age_birth` = `1_mother_age_birth`/25,
+         `2_totalexp` = `2_totalexp`/750,
+         `4_ppvt_raw`= `3_ppvt_raw`/200,
+         `4_maths_perco`= `3_maths_perco`/200,
+         `3_chore_hours`= `3_chore_hours`/2.2,
+         `3_read_encourage` = `3_read_encourage`/3.2,
+         `3_stunting_to_r3` = `3_stunting_to_r3`/2)
+
+temp.model <- '
+               # Caregiver Status
+                   # older_with_partner =~ `1_partner`
+                        # + `1_mother_age_birth`
+                   lit_ed =~`1_momedu` +`1_momlit`
+                  
+               # # Economic well-being
+                    eco_well_being_cfa =~`2_wi_early_yrs` +`2_food_insecurity_r2` 
+                    # +`2_totalexp`
+
+               # Education investment
+                   ed_invest =~`3_chore_hours` +`3_hours_study`+
+                                `3_read_encourage`
+         
+
+               # Adverse EC environment
+                    mmhealth =~`1_sdq1` +`1_sdq3` +`1_sdq4` +`1_sdq5` + 
+                               `1_sdq8` +`1_sdq10` + 
+                               `1_sdq13` +`1_sdq14` +
+                               `1_sdq17 `  +`1_sdq15` 
+                               
+                    
+                # Child health
+                    child_health =~`3_stunting_to_r3` 
+                                    # +`3_probs_vision` 
+                                    # +`3_probs_resp`
+
+                # School environment
+                   #  school_qual =~`3_care_school_qual2` +`3_care_school_qual3` +
+                   # `3_care_school_qual4` 
+                    # school_punish =~`3_school_punish1` +`3_school_punish2`  
+                     # lang_instruct =~`3_lang_instruct_matches`
+                     # school_environ =~ school_qual + lang_instruct
+                     # school_environ ~~ 1*school_environ
+
+                # Round`3 outcomes
+                    # outcomes_r3 =~`3_ppvt_raw` +`3_maths_perco` +`3_yrs_grtr_grade` +
+                                   # `3_literate` 
+                # Round`4 outcomes
+                    outcomes_r4 =~`4_ppvt_raw` +`4_maths_perco` 
+
+
+                # REG COMPONENT
+      
+                     eco_well_being_cfa ~ lit_ed          
+                     mmhealth ~ lit_ed 
+                     child_health ~ eco_well_being_cfa 
+                     ed_invest ~  mmhealth + eco_well_being_cfa
+                     # lang_instruct ~ eco_well_being_cfa
+                     outcomes_r4 ~ ed_invest + eco_well_being_cfa 
+                      # + child_health + lang_instruct
+
+              '
+
+temp$depriv_group = temp$`1_deprived_grouping`
+temp %<>% 
+  filter(depriv_group == 1)
+
+temp.model.fit <- sem(temp.model, data = temp)
+summary(temp.model.fit, fit.measures = T)
+inspect(temp.model.fit, "rsquare")
+x <- modindices(temp.model.fit)
+summary(temp.model.fit, fit.measures = T, standardized = TRUE)
+
+
+```
+
+
+# 5  Model by group : boys vs girls
+
+```{r struc+meas_r4_sex}
+
+# Try to repeat model for disad group split
+
+temp <- peru_long.dat %>% 
+          select(childid, round, typesite, indigenous, sex,
+                 mother_age_birth, partner, momedu, dadlit, momlit, 
+                 wi_early_yrs, food_insecurity_r2, totalexp,
+                 chore_hours, school_type, hours_study, read_encourage,
+                 sdq1, sdq3, sdq4, sdq5, 
+                 sdq9, sdq8, sdq10, sdq11, 
+                 sdq13, sdq16, sdq12, sdq14,
+                 sdq17, sdq20, sdq15, sdq18, 
+                 sdq19,
+                 drink_to_drunk, drunk_hit, alc_1perwk,
+                 stunting_to_r3, probs_vision, probs_resp,
+                 care_school_qual2, care_school_qual3,
+                 care_school_qual4, 
+                 school_punish1, school_punish2,
+                 lang_instruct_matches,
+                 ppvt_raw, maths_perco, yrs_grtr_grade, literate, deprived_grouping) %>% 
+          melt(id.vars = c("childid","round")) %>% 
+          dcast(childid ~ round + variable)
+
+temp %<>% 
+  mutate(`1_mother_age_birth` = `1_mother_age_birth`/25,
+         `2_totalexp` = `2_totalexp`/750,
+         `4_ppvt_raw`= `4_ppvt_raw`/200,
+         `4_maths_perco`= `4_maths_perco`/200,
+         `3_chore_hours`= `3_chore_hours`/2.2,
+         `3_read_encourage` = `3_read_encourage`/3.2,
+         `3_stunting_to_r3` = `3_stunting_to_r3`/2)
+
+temp.model <- '
+               # Caregiver Status
+                   older_with_partner =~ `1_partner` 
+                  # `1_mother_age_birth`
+                   lit_ed =~`1_momedu` +`1_momlit`
+                  
+               # # Economic well-being
+                    eco_well_being_cfa =~`2_wi_early_yrs` +`2_food_insecurity_r2` +`3_school_type`
+                    # +`2_totalexp`
+
+               # Education investment
+                   ed_invest =~`3_chore_hours` +`3_hours_study`+
+                                `3_read_encourage`
+         
+
+               # Adverse EC environment
+                    mmhealth =~`1_sdq1` +`1_sdq3` +`1_sdq4` +`1_sdq5` + 
+                               `1_sdq8` +`1_sdq10` + 
+                               `1_sdq13` +`1_sdq14` +
+                               `1_sdq17 `  +`1_sdq15` +`1_sdq18` +
+                               `1_sdq19`
+                    
+                # Child health
+                    child_health =~`3_stunting_to_r3` +`3_probs_vision` +`3_probs_resp`
+
+                # School environment
+                   #  school_qual =~`3_care_school_qual2` +`3_care_school_qual3` +
+                   # `3_care_school_qual4` 
+                    # school_punish =~`3_school_punish1` +`3_school_punish2`  
+                     # lang_instruct =~`3_lang_instruct_matches`
+                     # school_environ =~ school_qual + lang_instruct
+                     # school_environ ~~ 1*school_environ
+
+                # Round`3 outcomes
+                    # outcomes_r3 =~`3_ppvt_raw` +`3_maths_perco` +`3_yrs_grtr_grade` +
+                                  # `3_literate` 
+                # Round`4 outcomes
+                    outcomes_r4 =~`4_ppvt_raw` +`4_maths_perco` + `4_yrs_grtr_grade`
+
+
+                # REG COMPONENT
+      
+                     eco_well_being_cfa ~ lit_ed          
+                     mmhealth ~ lit_ed 
+                     child_health ~ eco_well_being_cfa 
+                     ed_invest ~ eco_well_being_cfa  + lit_ed
+                     # lang_instruct ~ eco_well_being_cfa
+                     outcomes_r4 ~ ed_invest 
+                      # + child_health + mmhealth + lang_instruct
+
+              '
+temp$sex <- temp$`1_sex`
+
+temp.model.fit <- sem(temp.model, data = temp, group = "sex")
+summary(temp.model.fit, fit.measures = T)
+inspect(temp.model.fit, "rsquare")
+x <- modindices(temp.model.fit)
+resid(temp.model.fit, type = "standardized")
+summary(temp.model.fit, fit.measures = T, standardized = TRUE)
+
+
+```
+
